@@ -122,6 +122,14 @@
 
 <div id="toast" class="toast"></div>
 
+<script>
+window.addEventListener('error', function(e){
+  var div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:10px;font-size:12px;z-index:9999;white-space:pre-wrap;font-family:monospace;';
+  div.textContent = 'Erro no app.js: ' + (e.message || 'erro desconhecido') + ' (linha ' + (e.lineno || '?') + ', coluna ' + (e.colno || '?') + ')';
+  document.body.prepend(div);
+});
+</script>
 <script src="app.js"></script>
 </body>
 </html>
