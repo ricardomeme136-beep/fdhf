@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Plano da Sofia</title>
+<meta name="theme-color" content="#0E9F82">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Plano Sofia">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="leaf-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2C7 2 3 6 3 11c0 6 9 11 9 11s9-5 9-11c0-5-4-9-9-9zm0 13a4 4 0 110-8 4 4 0 010 8z"/></svg>
+      </span>
+      <div>
+        <h1>Plano da Sofia</h1>
+        <p class="subtitle">acompanhamento diário</p>
+      </div>
+    </div>
+    <button id="remindersBtn" class="icon-btn" title="Lembretes" aria-label="Ativar lembretes">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 22a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0012 22zm7-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C8.64 5.36 7 7.92 7 11v5l-2 2v1h14v-1l-2-2z"/></svg>
+    </button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="today" role="tab" aria-selected="true">Hoje</button>
+    <button class="tab" data-tab="calendar" role="tab" aria-selected="false">Calendário</button>
+    <button class="tab" data-tab="recipe" role="tab" aria-selected="false">Receita</button>
+  </nav>
+
+  <main>
+    <!-- TODAY -->
+    <section id="today" class="panel active">
+      <div class="progress-card">
+        <div class="progress-ring-wrap">
+          <svg class="progress-ring" viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="42"></circle>
+            <circle id="ringFill" class="ring-fill" cx="50" cy="50" r="42"></circle>
+          </svg>
+          <div class="progress-label">
+            <span id="progressPct">0%</span>
+            <small>hoje</small>
+          </div>
+        </div>
+        <div class="stem-wrap">
+          <p class="stem-caption">Sequência da semana</p>
+          <svg id="stemSvg" viewBox="0 0 320 60" class="stem-svg"></svg>
+        </div>
+      </div>
+
+      <div id="dateHeading" class="date-heading"></div>
+      <div id="mealList" class="meal-list"></div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section id="calendar" class="panel">
+      <div class="cal-header">
+        <button id="prevMonth" class="icon-btn small" aria-label="Mês anterior">‹</button>
+        <h2 id="calMonthLabel"></h2>
+        <button id="nextMonth" class="icon-btn small" aria-label="Mês seguinte">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <div class="cal-legend">
+        <span><i class="dot full"></i> completo</span>
+        <span><i class="dot partial"></i> em curso</span>
+        <span><i class="dot none"></i> por fazer</span>
+      </div>
+      <div id="calDayDetail" class="cal-day-detail"></div>
+    </section>
+
+    <!-- RECIPE -->
+    <section id="recipe" class="panel">
+      <div class="recipe-card">
+        <div class="recipe-hero">
+          <div class="recipe-photo" aria-hidden="true">🥗</div>
+          <div>
+            <h2>Salada</h2>
+            <p class="recipe-author">por Rita Aguiar</p>
+            <p class="recipe-meta">⏱ 5 min a preparar · 🍽 5 min a confecionar</p>
+          </div>
+        </div>
+
+        <h3>Ingredientes</h3>
+        <ul class="ingredient-list">
+          <li>4 unidades de tomate cherry</li>
+          <li>50 gramas de cenoura ralada</li>
+          <li>10 gramas de rúcula</li>
+        </ul>
+
+        <h3>Método de preparação</h3>
+        <ol class="steps-list">
+          <li>Preparar uma salada com rúcula, tomate cherry e cenoura ralada.</li>
+        </ol>
+
+        <h3>Informação nutricional <span class="muted">(por 100 g)</span></h3>
+        <table class="nutrition-table">
+          <tr><td>Energia</td><td>28 kcal</td><td class="muted">1%</td></tr>
+          <tr><td>Proteína</td><td>1 g</td><td class="muted">1%</td></tr>
+          <tr><td>H. Carbono</td><td>4 g</td><td class="muted">1%</td></tr>
+          <tr><td>Açúcares</td><td>4 g</td><td class="muted">—</td></tr>
+          <tr><td>Gordura</td><td>0 g</td><td class="muted">1%</td></tr>
+          <tr><td>Gorduras saturadas</td><td>0 g</td><td class="muted">—</td></tr>
+          <tr><td>Fibra alimentar</td><td>2 g</td><td class="muted">6%</td></tr>
+          <tr><td>Sódio</td><td>27 mg</td><td class="muted">—</td></tr>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

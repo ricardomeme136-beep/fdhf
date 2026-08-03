@@ -1,0 +1,436 @@
+/* =========================================================
+   Plano da Sofia — dados do plano nutricional
+   ========================================================= */
+const MEAL_PLAN = [
+  { id:'pa', time:'07:20', name:'Pequeno Almoço', items:[
+    { id:'pa1', options:['Iogurte skyr natural (150 g)','2 ovos estrelados (90 g)'] },
+    { id:'pa2', options:['50 g de flocos de aveia','60 g de pão de trigo integral'] },
+  ]},
+  { id:'lm', time:'10:30', name:'Lanche da Manhã', note:'Só se tiveres fome', optional:true, items:[
+    { id:'lm1', options:['Iogurte skyr natural (150 g)'] },
+    { id:'lm2', options:['15 g de mix de frutos secos'] },
+  ]},
+  { id:'al', time:'12:30', name:'Almoço', note:'Come saudável o suficiente — mesmo se for em casa da tua mãe 💛', items:[
+    { id:'al1', options:['150 g de peixe cozinhado','3 ovos cozidos (168 g)'] },
+    { id:'al2', options:['150 g de arroz cozido','150 g de massa','200 g de batata cozida','190 g de batata doce assada'] },
+    { id:'al3', options:['200 g de legumes cozidos/salteados','200 g de salada'] },
+  ]},
+  { id:'lt', time:'16:30', name:'Lanche da Tarde', items:[
+    { id:'lt1', options:['1 porção de fruta (160 g)'] },
+  ]},
+  { id:'ja', time:'19:00', name:'Jantar', items:[
+    { id:'ja1', options:['150 g de peixe cozinhado','3 ovos cozidos (168 g)'] },
+    { id:'ja2', options:['150 g de arroz cozido','150 g de massa','200 g de batata cozida','190 g de batata doce assada'] },
+    { id:'ja3', options:['150 g de legumes cozidos/salteados','200 g de salada'] },
+    { id:'ja4', options:['1 copo grande de água mineral (357 g)'] },
+  ]},
+  { id:'ce', time:'22:00', name:'Ceia', note:'opcional', optional:true, items:[
+    { id:'ce1', options:['100 g de gelatina','½ fatia de queijo flamengo light (10 g)','3 canecas de chá de ervas (936 g)'] },
+  ]},
+];
+
+// Só as refeições obrigatórias contam para a conclusão do dia
+// (Lanche da Manhã e Ceia são opcionais no plano, por isso não bloqueiam o "completo")
+const REQUIRED_ITEM_IDS = new Set(
+  MEAL_PLAN.filter(m=>!m.optional).flatMap(m=>m.items.map(item=>item.id))
+);
+const TOTAL_ITEMS = REQUIRED_ITEM_IDS.size;
+const STORAGE_PREFIX = 'nutrium-sofia-';
+const WEEKDAYS_PT = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const MONTHS_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+/* ---------------- date helpers ---------------- */
+function toKey(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function keyToDate(key){ const [y,m,d]=key.split('-').map(Number); return new Date(y,m-1,d); }
+
+/* ---------------- storage ---------------- */
+function loadDay(dateKey){
+  try{
+    const raw = localStorage.getItem(STORAGE_PREFIX+dateKey);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveDay(dateKey, data){
+  try{ localStorage.setItem(STORAGE_PREFIX+dateKey, JSON.stringify(data)); }catch(e){}
+}
+function dayCompletion(dateKey){
+  const data = loadDay(dateKey);
+  const checked = Object.keys(data).filter(k=>REQUIRED_ITEM_IDS.has(k) && data[k] && data[k].done).length;
+  return { checked, total: TOTAL_ITEMS };
+}
+
+/* ---------------- toast ---------------- */
+let toastTimer;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+/* =========================================================
+   Rendering meals (shared by "Hoje" and calendar day detail)
+   ========================================================= */
+function renderMealList(container, dateKey, editable=true){
+  const state = loadDay(dateKey);
+  container.innerHTML = '';
+
+  MEAL_PLAN.forEach(meal=>{
+    const card = document.createElement('div');
+    card.className = 'meal-card';
+
+    const head = document.createElement('div');
+    head.className = 'meal-card-head';
+    head.innerHTML = `<span class="meal-time">${meal.time}</span><h3 class="meal-name">${meal.name}</h3>${meal.optional ? '<span class="meal-optional-badge">opcional</span>' : ''}`;
+    card.appendChild(head);
+
+    if(meal.note){
+      const note = document.createElement('div');
+      note.className = 'meal-note';
+      note.textContent = meal.note;
+      card.appendChild(note);
+    }
+
+    meal.items.forEach(item=>{
+      const row = document.createElement('div');
+      row.className = 'item-row';
+
+      const pills = document.createElement('div');
+      pills.className = 'option-pills';
+
+      const itemState = state[item.id] || {};
+
+      item.options.forEach(opt=>{
+        const pill = document.createElement('button');
+        pill.type='button';
+        pill.className = 'pill';
+        const isChosen = itemState.done && !itemState.custom && itemState.choice === opt;
+        if(isChosen) pill.classList.add('chosen');
+        pill.innerHTML = (isChosen?'<span class="check">✓</span>':'') + opt;
+        if(editable){
+          pill.addEventListener('click', ()=>{
+            const cur = loadDay(dateKey);
+            const already = cur[item.id] && cur[item.id].done && !cur[item.id].custom && cur[item.id].choice===opt;
+            if(already){
+              delete cur[item.id];
+            }else{
+              cur[item.id] = { done:true, choice:opt, custom:false };
+            }
+            saveDay(dateKey, cur);
+            renderMealList(container, dateKey, editable);
+            onStateChanged();
+          });
+        }
+        pills.appendChild(pill);
+      });
+
+      row.appendChild(pills);
+
+      // custom replacement toggle + input
+      const swapBtn = document.createElement('button');
+      swapBtn.type='button';
+      swapBtn.className='swap-toggle';
+      const hasCustom = itemState.done && itemState.custom;
+      swapBtn.textContent = hasCustom ? `⇄ substituí por: "${itemState.choice}" (mudar)` : '⇄ comi outra coisa';
+      const wrap = document.createElement('div');
+      wrap.className = 'custom-input-wrap';
+      const input = document.createElement('input');
+      input.type='text';
+      input.placeholder='O que comeste em vez disto?';
+      input.value = hasCustom ? itemState.choice : '';
+      const saveBtn = document.createElement('button');
+      saveBtn.type='button';
+      saveBtn.textContent='Guardar';
+
+      if(editable){
+        swapBtn.addEventListener('click', ()=>{ wrap.classList.toggle('show'); input.focus(); });
+        saveBtn.addEventListener('click', ()=>{
+          const val = input.value.trim();
+          if(!val) return;
+          const cur = loadDay(dateKey);
+          cur[item.id] = { done:true, choice:val, custom:true };
+          saveDay(dateKey, cur);
+          renderMealList(container, dateKey, editable);
+          onStateChanged();
+        });
+      } else {
+        swapBtn.disabled = true;
+      }
+
+      wrap.appendChild(input);
+      wrap.appendChild(saveBtn);
+      row.appendChild(swapBtn);
+      row.appendChild(wrap);
+      card.appendChild(row);
+    });
+
+    container.appendChild(card);
+  });
+}
+
+function onStateChanged(){
+  renderProgressRing();
+  renderStem();
+  renderCalendar(); // dots may have changed
+}
+
+/* =========================================================
+   Progress ring for today
+   ========================================================= */
+function renderProgressRing(){
+  const key = toKey(new Date());
+  const { checked, total } = dayCompletion(key);
+  const pct = total ? Math.round((checked/total)*100) : 0;
+  const circumference = 264; // 2*pi*42 approx
+  const offset = circumference - (circumference * pct/100);
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+
+/* =========================================================
+   Weekly "stem" streak signature — a leaf grows for each day
+   with at least one item checked, over the last 7 days
+   ========================================================= */
+function renderStem(){
+  const svg = document.getElementById('stemSvg');
+  svg.innerHTML = '';
+  const days = [];
+  for(let i=6;i>=0;i--){
+    const d = new Date();
+    d.setDate(d.getDate()-i);
+    days.push(d);
+  }
+  const w = 320, h = 60, stepX = w/8;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  const stem = document.createElementNS(ns,'line');
+  stem.setAttribute('x1', stepX*0.6); stem.setAttribute('y1', h-8);
+  stem.setAttribute('x2', stepX*7.4); stem.setAttribute('y2', h-8);
+  stem.setAttribute('stroke', '#DCEFE7'); stem.setAttribute('stroke-width','3');
+  stem.setAttribute('stroke-linecap','round');
+  svg.appendChild(stem);
+
+  days.forEach((d,i)=>{
+    const key = toKey(d);
+    const { checked, total } = dayCompletion(key);
+    const cx = stepX*(i+0.6)+stepX*0.4;
+    const full = checked>0 && checked>=total;
+    const some = checked>0;
+
+    const g = document.createElementNS(ns,'g');
+
+    if(some){
+      const leaf = document.createElementNS(ns,'path');
+      const scale = full ? 1 : 0.7;
+      const ly = h-8-14*scale;
+      leaf.setAttribute('d', `M${cx},${h-8} Q${cx-9*scale},${ly} ${cx},${ly-8*scale} Q${cx+9*scale},${ly} ${cx},${h-8} Z`);
+      leaf.setAttribute('fill', full ? '#0E9F82' : '#FFC857');
+      g.appendChild(leaf);
+    } else {
+      const dot = document.createElementNS(ns,'circle');
+      dot.setAttribute('cx',cx); dot.setAttribute('cy', h-8); dot.setAttribute('r','3');
+      dot.setAttribute('fill','#DCEFE7');
+      g.appendChild(dot);
+    }
+
+    const label = document.createElementNS(ns,'text');
+    label.setAttribute('x',cx); label.setAttribute('y', h-1);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('font-size','8');
+    label.setAttribute('fill','#6C8579');
+    label.textContent = WEEKDAYS_PT[d.getDay()].slice(0,1).toUpperCase();
+    g.appendChild(label);
+
+    svg.appendChild(g);
+  });
+}
+
+/* =========================================================
+   "Hoje" panel
+   ========================================================= */
+function renderToday(){
+  const now = new Date();
+  const heading = document.getElementById('dateHeading');
+  heading.textContent = `${WEEKDAYS_PT[now.getDay()]}, ${now.getDate()} de ${MONTHS_PT[now.getMonth()]}`;
+  renderMealList(document.getElementById('mealList'), toKey(now), true);
+  renderProgressRing();
+  renderStem();
+}
+
+/* =========================================================
+   Calendar
+   ========================================================= */
+let calViewDate = new Date();
+let selectedDayKey = null;
+
+function renderCalendar(){
+  const label = document.getElementById('calMonthLabel');
+  label.textContent = `${MONTHS_PT[calViewDate.getMonth()]} de ${calViewDate.getFullYear()}`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  const year = calViewDate.getFullYear(), month = calViewDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayKey = toKey(new Date());
+
+  for(let i=0;i<startOffset;i++){
+    const empty = document.createElement('div');
+    empty.className='cal-cell empty';
+    grid.appendChild(empty);
+  }
+
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(year, month, day);
+    const key = toKey(d);
+    const { checked, total } = dayCompletion(key);
+
+    const cell = document.createElement('button');
+    cell.type='button';
+    cell.className='cal-cell';
+    if(key===todayKey) cell.classList.add('today');
+    if(key===selectedDayKey) cell.classList.add('selected');
+
+    let dotClass='';
+    if(checked>0 && checked>=total) dotClass='full';
+    else if(checked>0) dotClass='partial';
+
+    cell.innerHTML = `<span>${day}</span><span class="dot ${dotClass}"></span>`;
+    cell.addEventListener('click', ()=>{
+      selectedDayKey = key;
+      renderCalendar();
+      renderDayDetail(key);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+function renderDayDetail(key){
+  const detail = document.getElementById('calDayDetail');
+  const d = keyToDate(key);
+  detail.innerHTML = `<h3>${WEEKDAYS_PT[d.getDay()]}, ${d.getDate()} de ${MONTHS_PT[d.getMonth()]}</h3><div id="calDayMeals"></div>`;
+  renderMealList(document.getElementById('calDayMeals'), key, true);
+}
+
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  calViewDate.setMonth(calViewDate.getMonth()-1);
+  renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', ()=>{
+  calViewDate.setMonth(calViewDate.getMonth()+1);
+  renderCalendar();
+});
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>{t.classList.remove('active'); t.setAttribute('aria-selected','false');});
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active'); tab.setAttribute('aria-selected','true');
+    const target = document.getElementById(tab.dataset.tab);
+    target.classList.add('active');
+    if(tab.dataset.tab==='calendar'){
+      selectedDayKey = toKey(new Date());
+      renderCalendar();
+      renderDayDetail(selectedDayKey);
+    }
+  });
+});
+
+/* =========================================================
+   Reminders (Notification API + Service Worker)
+   ========================================================= */
+const REMINDER_FLAG = 'nutrium-sofia-reminders-on';
+let reminderTimers = [];
+
+function clearReminderTimers(){
+  reminderTimers.forEach(t=>clearTimeout(t));
+  reminderTimers = [];
+}
+
+function scheduleTodayReminders(){
+  clearReminderTimers();
+  const now = new Date();
+  MEAL_PLAN.forEach(meal=>{
+    const [h,m] = meal.time.split(':').map(Number);
+    const target = new Date();
+    target.setHours(h,m,0,0);
+    if(target < now) return; // já passou hoje
+    const ms = target.getTime() - now.getTime();
+    const timer = setTimeout(()=>fireReminder(meal), ms);
+    reminderTimers.push(timer);
+  });
+}
+
+function fireReminder(meal){
+  const body = `${meal.time} · ${meal.name} — marca o que comeste no plano ✅`;
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistration().then(reg=>{
+      if(reg){ reg.showNotification('Plano da Sofia', { body, icon:'icons/icon-192.png', badge:'icons/icon-192.png' }); }
+      else if(Notification.permission==='granted'){ new Notification('Plano da Sofia', { body }); }
+    });
+  } else if(Notification.permission==='granted'){
+    new Notification('Plano da Sofia', { body });
+  }
+  // reagenda para amanhã à mesma hora
+  const [h,m] = meal.time.split(':').map(Number);
+  const next = new Date();
+  next.setDate(next.getDate()+1);
+  next.setHours(h,m,0,0);
+  const ms = next.getTime() - Date.now();
+  reminderTimers.push(setTimeout(()=>fireReminder(meal), ms));
+}
+
+function setRemindersUI(on){
+  const btn = document.getElementById('remindersBtn');
+  btn.classList.toggle('active', on);
+}
+
+document.getElementById('remindersBtn').addEventListener('click', async ()=>{
+  if(!('Notification' in window)){
+    showToast('O teu navegador não suporta notificações. No iPhone: adiciona à Ecrã Principal primeiro.');
+    return;
+  }
+  const currentlyOn = localStorage.getItem(REMINDER_FLAG)==='1';
+  if(currentlyOn){
+    localStorage.setItem(REMINDER_FLAG,'0');
+    clearReminderTimers();
+    setRemindersUI(false);
+    showToast('Lembretes desativados.');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm==='granted'){
+    localStorage.setItem(REMINDER_FLAG,'1');
+    scheduleTodayReminders();
+    setRemindersUI(true);
+    showToast('Lembretes ativados para as horas das refeições 🔔');
+  }else{
+    showToast('Permissão de notificações não concedida.');
+  }
+});
+
+/* =========================================================
+   Boot
+   ========================================================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+renderToday();
+renderCalendar();
+
+if(localStorage.getItem(REMINDER_FLAG)==='1' && Notification.permission==='granted'){
+  scheduleTodayReminders();
+  setRemindersUI(true);
+}
